@@ -1,0 +1,16 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "{473EAABC-E501-453A-A382-C7401088A407}",
+	"Category": "",
+	"Description": "",
+	"Modules": [
+		{
+			"Name": "Museum",
+			"Type": "Runtime",
+			"LoadingPhase": "Default",
+			"AdditionalDependencies": [
+				"Engine"
+			]
+		}
+	]
+}
