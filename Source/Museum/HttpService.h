@@ -34,11 +34,18 @@ protected:
 	bool ResponseIsValid(FHttpResponsePtr Response, bool bWasSuccessful);
 
 	template <typename StructType>
-	void GetJsonStringFromStruct(StructType FilledStruct, FString& StringOutput);
+	void GetJsonStringFromStruct(StructType FilledStruct, FString& StringOutput) {
+		FJsonObjectConverter::UStructToJsonObjectString(StructType::StaticStruct(), &FilledStruct, StringOutput, 0, 0);
+	}
+
 	template <typename StructType>
-	void GetStructFromJsonString(FHttpResponsePtr Response, StructType& StructOutput);
+	void GetStructFromJsonString(FHttpResponsePtr Response, StructType& StructOutput) {
+		StructType StructData;
+		FString JsonString = Response->GetContentAsString();
+		FJsonObjectConverter::JsonObjectStringToUStruct<StructType>(JsonString, &StructOutput, 0, 0);
+	}
 
 public:
-	UPROPERTY(VisibleAnywhere)
-	FString ApiBaseUrl = "https://localhost:8080/";
+	UPROPERTY(EditAnywhere)
+	FString ApiBaseUrl = "http://localhost:8080/";
 };

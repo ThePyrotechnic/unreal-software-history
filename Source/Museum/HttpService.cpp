@@ -58,14 +58,3 @@ bool AHttpService::ResponseIsValid(FHttpResponsePtr Response, bool bWasSuccessfu
 	}
 }
 
-template <typename StructType>
-void AHttpService::GetJsonStringFromStruct(StructType FilledStruct, FString& StringOutput) {
-	FJsonObjectConverter::UStructToJsonObjectString(StructType::StaticStruct(), &FilledStruct, StringOutput, 0, 0);
-}
-
-template <typename StructType>
-void AHttpService::GetStructFromJsonString(FHttpResponsePtr Response, StructType& StructOutput) {
-	StructType StructData;
-	FString JsonString = Response->GetContentAsString();
-	FJsonObjectConverter::JsonObjectStringToUStruct<StructType>(JsonString, &StructOutput, 0, 0);
-}

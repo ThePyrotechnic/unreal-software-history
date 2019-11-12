@@ -14,19 +14,43 @@ AMuseumApi::AMuseumApi() {
 void AMuseumApi::BeginPlay() {
 	Super::BeginPlay();
 	
-	GetNode()
+	GetNodeWithRelationships("http://www.wikidata.org/entity/Q307441");
 }
 
 void AMuseumApi::GetNode(FString Uri) {
 	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri);
 	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetNodeResponse);
+	Send(Request);
 }
 
 void AMuseumApi::GetNodeResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
 	if (!ResponseIsValid(Response, bWasSuccessful)) return;
 
-	FSoftwareNode Node;
-	GetStructFromJsonString<FSoftwareNode>(Response, Node);
+	FGraphNode Node;
+	GetStructFromJsonString<FGraphNode>(Response, Node);
 
-	UE_LOG(LogTemp, Warning, TEXT("uri: %s | label: %s"), Node.Uri, Node.Label);
+	UE_LOG(LogTemp, Warning, TEXT("Test complete"));
+	if (GEngine) {
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, 
+			TEXT("uri: ") + Node.Uri + TEXT(" | Label: ") + Node.Label + TEXT(" | Id: ") + Node.Id + TEXT(" | Type: ") + Node.Type);
+	}
+}
+
+void AMuseumApi::GetNodeWithRelationships(FString Uri) {
+	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri + "&include_relationships=true");
+	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse);
+	Send(Request);
+}
+
+void AMuseumApi::GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
+	if (!ResponseIsValid(Response, bWasSuccessful)) return;
+
+	FMuseumGraph Graph;
+	GetStructFromJsonString<FMuseumGraph>(Response, Graph);
+	// TODO Need to explicity parse arrays
+	UE_LOG(LogTemp, Warning, TEXT("Test complete"));
+	if (GEngine) {
+		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, 
+			TEXT("node count: ") + FString::FromInt(Graph.Relationships.Num()) + TEXT("relation count:") + FString::FromInt(Graph.Nodes.Num()));
+	}
 }
