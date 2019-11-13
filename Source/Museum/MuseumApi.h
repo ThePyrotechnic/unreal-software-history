@@ -9,7 +9,7 @@
 #include "MuseumApi.generated.h"
 
 USTRUCT()
-struct FGraphNode {
+struct FMuseumNode {
 	GENERATED_BODY()
 
 	UPROPERTY() FString Id;
@@ -17,27 +17,27 @@ struct FGraphNode {
 	UPROPERTY() FString Label;
 	UPROPERTY() FString Type;
 
-	FGraphNode() {}
+	FMuseumNode() {}
 };
 
 USTRUCT()
-struct FRelationship {
+struct FMuseumRelationship {
 	GENERATED_BODY()
 
 	UPROPERTY() FString Id;
-	UPROPERTY() FString Label;
+	UPROPERTY() FString Type;
 	UPROPERTY() FString StartId;
 	UPROPERTY() FString EndId;
 
-	FRelationship() {}	
+	FMuseumRelationship() {}	
 };
 
 USTRUCT()
 struct FMuseumGraph {
 	GENERATED_BODY()
 
-	UPROPERTY() TArray<FGraphNode> Nodes;
-	UPROPERTY() TArray<FRelationship> Relationships;
+	UPROPERTY() TArray<FMuseumNode> Nodes;
+	UPROPERTY() TArray<FMuseumRelationship> Relationships;
 
 	FMuseumGraph() {}
 };
@@ -56,11 +56,9 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
-	void GetNodeResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 
 	void GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 public:
-	void GetNode(FString Uri);
 
 	void GetNodeWithRelationships(FString Uri);
 };

@@ -1,6 +1,8 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
+#include "Json.h"
+#include "JsonUtilities.h"
 #include "MuseumApi.h"
 
 
@@ -17,25 +19,6 @@ void AMuseumApi::BeginPlay() {
 	GetNodeWithRelationships("http://www.wikidata.org/entity/Q307441");
 }
 
-void AMuseumApi::GetNode(FString Uri) {
-	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri);
-	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetNodeResponse);
-	Send(Request);
-}
-
-void AMuseumApi::GetNodeResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
-	if (!ResponseIsValid(Response, bWasSuccessful)) return;
-
-	FGraphNode Node;
-	GetStructFromJsonString<FGraphNode>(Response, Node);
-
-	UE_LOG(LogTemp, Warning, TEXT("Test complete"));
-	if (GEngine) {
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, 
-			TEXT("uri: ") + Node.Uri + TEXT(" | Label: ") + Node.Label + TEXT(" | Id: ") + Node.Id + TEXT(" | Type: ") + Node.Type);
-	}
-}
-
 void AMuseumApi::GetNodeWithRelationships(FString Uri) {
 	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri + "&include_relationships=true");
 	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse);
@@ -46,11 +29,14 @@ void AMuseumApi::GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Resp
 	if (!ResponseIsValid(Response, bWasSuccessful)) return;
 
 	FMuseumGraph Graph;
-	GetStructFromJsonString<FMuseumGraph>(Response, Graph);
-	// TODO Need to explicity parse arrays
-	UE_LOG(LogTemp, Warning, TEXT("Test complete"));
-	if (GEngine) {
-		GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Red, 
-			TEXT("node count: ") + FString::FromInt(Graph.Relationships.Num()) + TEXT("relation count:") + FString::FromInt(Graph.Nodes.Num()));
+	FString JsonString = Response->GetContentAsString();
+	UE_LOG(LogTemp, Warning, TEXT("NEW STRING"), *JsonString);
+	if (FJsonObjectConverter::JsonObjectStringToUStruct<FMuseumGraph>(JsonString, &Graph, 0, 0)) {
+		for (int a = 0; a < Graph.Nodes.Num(); a++)
+			UE_LOG(LogTemp, Warning, TEXT("Node Id: %s | Type: %s | Label: %s | Uri: %s"), 
+				*Graph.Nodes[a].Id, *Graph.Nodes[a].Type, *Graph.Nodes[a].Label, *Graph.Nodes[a].Uri);
+		for (int a = 0; a < Graph.Relationships.Num(); a++)
+			UE_LOG(LogTemp, Warning, TEXT("Relationship Id: %s | Type: %s | StartId: %s | EndId: %s"), 
+				*Graph.Relationships[a].Id, *Graph.Relationships[a].Type, *Graph.Relationships[a].StartId, *Graph.Relationships[a].EndId);
 	}
 }
