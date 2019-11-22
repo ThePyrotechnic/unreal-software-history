@@ -1,9 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 
+#include "MuseumApi.h"
 #include "Json.h"
 #include "JsonUtilities.h"
-#include "MuseumApi.h"
 
 
 // Sets default values
@@ -15,28 +15,28 @@ AMuseumApi::AMuseumApi() {
 // Called when the game starts or when spawned
 void AMuseumApi::BeginPlay() {
 	Super::BeginPlay();
-	
-	GetNodeWithRelationships("http://www.wikidata.org/entity/Q307441");
 }
 
-void AMuseumApi::GetNodeWithRelationships(FString Uri) {
-	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri + "&include_relationships=true");
-	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse);
+void AMuseumApi::GetNodeWithRelationships(FString Uri, ResponseDelegate Callback) {
+	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri);
+	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse, Callback);
 	Send(Request);
 }
 
-void AMuseumApi::GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
-	if (!ResponseIsValid(Response, bWasSuccessful)) return;
+void AMuseumApi::GetClassAndSoftware(FString ClassUri, ResponseDelegate Callback) {
+	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("class?uri=") + ClassUri);
+	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse, Callback);
+	Send(Request);
+}
 
-	FMuseumGraph Graph;
+void AMuseumApi::GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, ResponseDelegate Callback) {
+	if (!ResponseIsValid(Response, bWasSuccessful)) return;
+	
 	FString JsonString = Response->GetContentAsString();
-	UE_LOG(LogTemp, Warning, TEXT("NEW STRING"), *JsonString);
-	if (FJsonObjectConverter::JsonObjectStringToUStruct<FMuseumGraph>(JsonString, &Graph, 0, 0)) {
-		for (int a = 0; a < Graph.Nodes.Num(); a++)
-			UE_LOG(LogTemp, Warning, TEXT("Node Id: %s | Type: %s | Label: %s | Uri: %s"), 
-				*Graph.Nodes[a].Id, *Graph.Nodes[a].Type, *Graph.Nodes[a].Label, *Graph.Nodes[a].Uri);
-		for (int a = 0; a < Graph.Relationships.Num(); a++)
-			UE_LOG(LogTemp, Warning, TEXT("Relationship Id: %s | Type: %s | StartId: %s | EndId: %s"), 
-				*Graph.Relationships[a].Id, *Graph.Relationships[a].Type, *Graph.Relationships[a].StartId, *Graph.Relationships[a].EndId);
+
+	FMuseumGraph* Graph = new FMuseumGraph();
+
+	if (FJsonObjectConverter::JsonObjectStringToUStruct<FMuseumGraph>(JsonString, Graph, 0, 0)) {
+		Callback.Execute(Graph);
 	}
 }

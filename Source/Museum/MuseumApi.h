@@ -29,7 +29,7 @@ struct FMuseumRelationship {
 	UPROPERTY() FString StartId;
 	UPROPERTY() FString EndId;
 
-	FMuseumRelationship() {}	
+	FMuseumRelationship() {}
 };
 
 USTRUCT()
@@ -41,6 +41,8 @@ struct FMuseumGraph {
 
 	FMuseumGraph() {}
 };
+
+DECLARE_DELEGATE_OneParam(ResponseDelegate, FMuseumGraph*)
 
 UCLASS()
 class MUSEUM_API AMuseumApi : public AHttpService
@@ -56,9 +58,10 @@ protected:
 	virtual void BeginPlay() override;
 
 private:
+	void GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, ResponseDelegate Callback);
 
-	void GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 public:
+	void GetNodeWithRelationships(FString Uri, ResponseDelegate Callback);
 
-	void GetNodeWithRelationships(FString Uri);
+	void GetClassAndSoftware(FString ClassUri, ResponseDelegate Callback);
 };

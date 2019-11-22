@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
+#include "VisualNode.h"
+#include "MuseumApi.h"
 #include "MuseumGameModeBase.generated.h"
 
 /**
@@ -16,4 +18,26 @@ class MUSEUM_API AMuseumGameModeBase : public AGameModeBase
 	
 
 	virtual void StartPlay() override;
+
+public:
+	AMuseumGameModeBase();
+
+private:
+	AMuseumApi* Api;
+
+	void LogGraph(FMuseumGraph* Graph);
+
+	const float TwoPi = 3.14159 * 2;
+
+public:
+	UPROPERTY(EditAnywhere)
+	float NodeDistance;
+
+	UPROPERTY(EditAnywhere)
+	FVector TreeBase;
+
+	UPROPERTY(EditAnywhere)
+	TSubclassOf<class AVisualNode> NodeTemplate;
+
+	void ClassAndSoftwareCallback(FMuseumGraph* Graph);
 };
