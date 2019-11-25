@@ -16,6 +16,16 @@ struct FMuseumNode {
 	UPROPERTY() FString Uri;
 	UPROPERTY() FString Label;
 	UPROPERTY() FString Type;
+	UPROPERTY() int32 ReleaseYear;
+	UPROPERTY() int32 ReleaseMonth;
+	UPROPERTY() int32 ReleaseDay;
+
+
+	UPROPERTY() TArray<FString> Parents;
+	UPROPERTY() TArray<FString> Children;
+	UPROPERTY() TArray<FString> Software;
+
+	UPROPERTY() int32 Weight = 0;
 
 	FMuseumNode() {}
 };
@@ -61,7 +71,7 @@ private:
 	void GetGraphResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful, ResponseDelegate Callback);
 
 public:
-	void GetNodeWithRelationships(FString Uri, ResponseDelegate Callback);
-
 	void GetClassAndSoftware(FString ClassUri, ResponseDelegate Callback);
+
+	void GetGraph(ResponseDelegate Callback);
 };

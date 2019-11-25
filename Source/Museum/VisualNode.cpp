@@ -50,13 +50,10 @@ void AVisualNode::Tick(float DeltaTime)
 void AVisualNode::OnOverlapBegin(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult) {
 	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr) {
 		if (GEngine && MuseumNode)
-        	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, MuseumNode->Label);
+        	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, MuseumNode->Label + TEXT(" : ") + FString::FromInt(MuseumNode->ReleaseYear));
     }  
 }
 
 void AVisualNode::OnOverlapEnd(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp, int32 OtherBodyIndex) {
-	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr) {  
-       if (GEngine)
-        	GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Yellow, TEXT("Left ") + MuseumNode->Label);
-    }  
+	if (OtherActor != nullptr && OtherActor != this && OtherComp != nullptr) {}
 }

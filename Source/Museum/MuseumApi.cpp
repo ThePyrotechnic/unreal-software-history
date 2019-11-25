@@ -17,14 +17,14 @@ void AMuseumApi::BeginPlay() {
 	Super::BeginPlay();
 }
 
-void AMuseumApi::GetNodeWithRelationships(FString Uri, ResponseDelegate Callback) {
-	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("node?uri=") + Uri);
+void AMuseumApi::GetClassAndSoftware(FString ClassUri, ResponseDelegate Callback) {
+	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("class?uri=") + ClassUri);
 	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse, Callback);
 	Send(Request);
 }
 
-void AMuseumApi::GetClassAndSoftware(FString ClassUri, ResponseDelegate Callback) {
-	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("class?uri=") + ClassUri);
+void AMuseumApi::GetGraph(ResponseDelegate Callback) {
+	TSharedRef<IHttpRequest> Request = GetRequest(TEXT("graph"));
 	Request->OnProcessRequestComplete().BindUObject(this, &AMuseumApi::GetGraphResponse, Callback);
 	Send(Request);
 }
