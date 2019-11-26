@@ -26,15 +26,18 @@ private:
 
 	void CalculateWeight(FMuseumNode* Node);
 
-	void PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TArray<FMuseumNode*>* Classes);
+	void PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TArray<FMuseumNode*>* Classes, float CurrentRadius, FVector2D CurrentCenter);
 
 	int32 PlaceSoftware(const TMap<FString, FMuseumNode*>& NodeIdMap, AVisualNode* VisualClassNode);
 
-	const float TwoPi = 3.14159 * 2;
+	const float Pi = 3.14159;
+	const float TwoPi = Pi * 2;
 
 public:
 	UPROPERTY(EditAnywhere)
 	float YearToUnits = 350.f;
+
+	UPROPERTY(EditAnywhere)
 	float HelixRadius = 500.f;
 
 	UPROPERTY(EditAnywhere)

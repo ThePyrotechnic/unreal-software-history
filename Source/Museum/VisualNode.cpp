@@ -17,7 +17,7 @@ AVisualNode::AVisualNode()
 	CollisionMesh->SetupAttachment(RootComponent);
 	CollisionMesh->SetRelativeLocation(FVector(0));
 	CollisionMesh->SetSphereRadius(51.f);
-	CollisionMesh->SetHiddenInGame(false);
+	// CollisionMesh->SetHiddenInGame(false);
 	CollisionMesh->SetCollisionProfileName("BlockAllDynamic");
 
 
@@ -25,7 +25,7 @@ AVisualNode::AVisualNode()
 	DetectionMesh->SetupAttachment(RootComponent);
 	DetectionMesh->SetRelativeLocation(FVector(0));
 	DetectionMesh->SetSphereRadius(150.f);
-	DetectionMesh->SetHiddenInGame(false);
+	// DetectionMesh->SetHiddenInGame(false);
 	DetectionMesh->ShapeColor = FColor(0, 255, 0, 255);
 
 	DetectionMesh->OnComponentBeginOverlap.AddDynamic(this, &AVisualNode::OnOverlapBegin);

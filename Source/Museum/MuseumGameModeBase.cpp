@@ -2,6 +2,7 @@
 
 
 #include "MuseumGameModeBase.h"
+#include "Classes/Components/SphereComponent.h"
 
 
 AMuseumGameModeBase::AMuseumGameModeBase() {
@@ -105,32 +106,36 @@ void AMuseumGameModeBase::GraphCallback(FMuseumGraph* Graph) {
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Nodes: %i | Classes: %i | Edges: %i"), NodeIdMap.Num(), Classes.Num(), Edges->Num());
-	PlaceClasses(&NodeIdMap, Edges);
+
+	PlaceClasses(&NodeIdMap, Edges, 0, FVector2D(0, 0));
 }
 
 void AMuseumGameModeBase::CalculateWeight(FMuseumNode* Node) {
 	Node->Weight = Node->Software.Num();
 }
 
-void AMuseumGameModeBase::PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TArray<FMuseumNode*>* Classes) {
+void AMuseumGameModeBase::PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TArray<FMuseumNode*>* Classes, float CurrentRadius, FVector2D CurrentCenter) {
 	Classes->Sort([](const FMuseumNode& a, const FMuseumNode& b) {
 		return a.Weight < b.Weight;
 	});
 
 	TArray<FMuseumNode*>* Parents = new TArray<FMuseumNode*>();
 
-	// for (auto& Node : *Classes) {
-		FMuseumNode* Node = (*NodeIdMap)["281"];
+	for (auto& Node : *Classes) {
+		// FMuseumNode* Node = (*NodeIdMap)["43"];
 		// Temporarily spawn the class at the origin in order to spawn its software, and then move it
 		AVisualNode* ClassNode = GetWorld()->SpawnActor<AVisualNode>(NodeTemplate, FVector(0), FRotator(0));
 		ClassNode->MuseumNode = Node;
 		float ClassRadius = PlaceSoftware(*NodeIdMap, ClassNode);
+		
+		
 		// TODO move class based on total used width so far
-	// }
+	}
 
 	delete Classes;
 
-	// PlaceClasses(NodeIdMap, Parents);
+	// if (Parents->Num() > 0)
+	// 	PlaceClasses(NodeIdMap, Parents, CurrentRadius, CurrentCenter);
 }
 
 int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& NodeIdMap, AVisualNode* VisualClassNode) {
@@ -138,11 +143,18 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 
 	TMap<int32, TArray<FMuseumNode*>> NodesByYear;
 
+	int32 LowestYear = 3000000; // Y2K etc...
 	for (auto& Node : ClassNode.Software) {
 		UE_LOG(LogTemp, Warning, TEXT("Node Id: %s | Type: %s | Label: %s | Uri: %s | ReleaseYear: %i"), 
 			*NodeIdMap[Node]->Id, *NodeIdMap[Node]->Type, *NodeIdMap[Node]->Label, *NodeIdMap[Node]->Uri,
 			NodeIdMap[Node]->ReleaseYear);
+		
 		int32 ReleaseYear = NodeIdMap[Node]->ReleaseYear;
+
+		if (ReleaseYear == 0) continue;
+
+		if (ReleaseYear < LowestYear) LowestYear = ReleaseYear;
+
 		if (NodesByYear.Contains(ReleaseYear)) {
 			NodesByYear[ReleaseYear].Add(NodeIdMap[Node]);
 		}
@@ -152,29 +164,51 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 		}
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("ClassNode.Software: %i"), ClassNode.Software.Num());
-	
+	VisualClassNode->SetActorLocation(FVector(0, 0, (LowestYear - 3) * YearToUnits));
+	#if WITH_EDITOR
+		VisualClassNode->SetActorLabel(ClassNode.Label);
+	#endif  // WITH_EDITOR
+
+	float MinRadius = ((USphereComponent*)NodeTemplate->GetDefaultSubobjectByName(TEXT("DetectionMesh")))->GetScaledSphereRadius();
+	// UE_LOG(LogTemp, Warning, TEXT("NodeDistance: %f | MinRadius: %f | LowestYear: %i | YearToUnits: %f"),
+	// 	NodeDistance, MinRadius, LowestYear, YearToUnits);
+
+	float MaxGeneratedRadius = 0.f;
+
 	for (auto& Element : NodesByYear) {
 		int32 CurrentYear = Element.Key;
 		int32 SoftwarePlaced = 0;
+
 		FVector Center = {0, 0, CurrentYear * YearToUnits};
 		FMath::SinCos(&Center.X, &Center.Y, CurrentYear);
+		Center *= FVector(HelixRadius, HelixRadius, 1);
+
+		float NumSoftware = Element.Value.Num();
+
+		// The required radius for maintaining the desired NodeDistance
+		// https://mathopenref.com/polygonsides.html
+		float Radius = (NumSoftware == 1) ? 0 :  NodeDistance / (2 * FMath::Sin(Pi/NumSoftware));
+
+		// This Radius plus the helix radius is the total radius of this class' "column" in space
+		if (Radius > MaxGeneratedRadius) MaxGeneratedRadius = Radius;
+
+		// Evenly space the nodes
+		float Angle = TwoPi / NumSoftware;
+
+		// UE_LOG(LogTemp, Warning, TEXT("Current center: (%f, %f, %f) | Angle: %f | Radius: %f | NumSoftware: %f"), 
+		// 	Center.X, Center.Y, Center.Z, Angle, Radius, NumSoftware);
+
+		float SinAngle, CosAngle;
 		for (auto& SoftwareNode : Element.Value) {
-			float NumSoftware = Element.Value.Num();
-
-			// The required radius for maintaining the desired NodeDistance
-			float Radius = NodeDistance * NumSoftware / TwoPi;
-
-			// Evenly space the nodes
-			float Angle = TwoPi / NumSoftware;
-
-			float SinAngle, CosAngle;
 			FMath::SinCos(&SinAngle, &CosAngle, Angle * SoftwarePlaced++);
 
 			AVisualNode* VisualSoftwareNode = GetWorld()->SpawnActor<AVisualNode>(NodeTemplate, Center + FVector(Radius, Radius, 1) * FVector(SinAngle, CosAngle, 1), FRotator(0));
 			VisualSoftwareNode->MuseumNode = SoftwareNode;
 			VisualSoftwareNode->AttachToActor(VisualClassNode, FAttachmentTransformRules::KeepWorldTransform);
+			#if WITH_EDITOR
+				VisualSoftwareNode->SetActorLabel(SoftwareNode->Label);
+			#endif // WITH_EDITOR
 		}
 	}
-	return 666;
+	return HelixRadius + MaxGeneratedRadius;
 }
