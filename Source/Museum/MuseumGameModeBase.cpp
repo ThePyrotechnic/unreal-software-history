@@ -26,6 +26,8 @@ void AMuseumGameModeBase::StartPlay()
 {
     Super::StartPlay();
 
+	SeededRand = FRandomStream(RandomSeed);
+
 	Api = GetWorld()->SpawnActor<AMuseumApi>(FVector(0), FRotator(0));
 
 	// ResponseDelegate ClassAndSoftwareDel;
@@ -33,9 +35,11 @@ void AMuseumGameModeBase::StartPlay()
 	// // "source code editor"
 	// Api->GetClassAndSoftware("http://www.wikidata.org/entity/Q522972", ClassAndSoftwareDel);
 
-	ResponseDelegate GraphDel;
-	GraphDel.BindUObject(this, &AMuseumGameModeBase::GraphCallback);
-	Api->GetGraph(GraphDel);
+	if (bEnableSpawning) {
+		ResponseDelegate GraphDel;
+		GraphDel.BindUObject(this, &AMuseumGameModeBase::GraphCallback);
+		Api->GetGraph(GraphDel);
+	}
 }
 
 void AMuseumGameModeBase::ClassAndSoftwareCallback(FMuseumGraph* Graph) {
@@ -99,55 +103,129 @@ void AMuseumGameModeBase::GraphCallback(FMuseumGraph* Graph) {
 	}
 
 	// Get all edge classes
-	TArray<FMuseumNode*>* Edges = new TArray<FMuseumNode*>();
+	TSet<FString>* Edges = new TSet<FString>();
 	for (auto& Node : Classes) {
 		CalculateWeight(Node);
-		if (Node->Children.Num() == 0) Edges->Add(Node);
+		if (Node->Children.Num() == 0) Edges->Add(Node->Id);
 	}
 
 	UE_LOG(LogTemp, Warning, TEXT("Nodes: %i | Classes: %i | Edges: %i"), NodeIdMap.Num(), Classes.Num(), Edges->Num());
 
-	PlaceClasses(&NodeIdMap, Edges, 0, FVector2D(0, 0));
+	TSet<FString>* SpawnedClasses = new TSet<FString>();
+
+	PlaceClasses(&NodeIdMap, SpawnedClasses, Edges, 0, FVector2D(0, 0));
+
+	delete SpawnedClasses;
 }
 
 void AMuseumGameModeBase::CalculateWeight(FMuseumNode* Node) {
 	Node->Weight = Node->Software.Num();
 }
 
-void AMuseumGameModeBase::PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TArray<FMuseumNode*>* Classes, float CurrentRadius, FVector2D CurrentCenter) {
-	Classes->Sort([](const FMuseumNode& a, const FMuseumNode& b) {
-		return a.Weight < b.Weight;
-	});
+void AMuseumGameModeBase::PlaceClasses(TMap<FString, FMuseumNode*>* NodeIdMap, TSet<FString>* SpawnedClasses, TSet<FString>* Classes, float CurrentRadius, FVector2D CurrentCenter) {
+	// MATH WARNING
+	// ------------
+	// Classes->Sort([](const FMuseumNode& a, const FMuseumNode& b) {
+	// 	return a.Weight < b.Weight;
+	// });
 
-	TArray<FMuseumNode*>* Parents = new TArray<FMuseumNode*>();
+	TSet<FString> Ignored;
+	Ignored.Add("");
 
-	for (auto& Node : *Classes) {
+	TSet<FString>* Parents = new TSet<FString>();
+
+	float OldRadius = CurrentRadius;
+	FVector2D OldCenter = CurrentCenter;
+
+	FVector2D ClassPosition;
+	FVector2D NewCenter;
+	for (auto& NodeId : *Classes) {
 		// FMuseumNode* Node = (*NodeIdMap)["43"];
-		// Temporarily spawn the class at the origin in order to spawn its software, and then move it
-		AVisualNode* ClassNode = GetWorld()->SpawnActor<AVisualNode>(NodeTemplate, FVector(0), FRotator(0));
-		ClassNode->MuseumNode = Node;
-		float ClassRadius = PlaceSoftware(*NodeIdMap, ClassNode);
-		
-		
-		// TODO move class based on total used width so far
+
+		if (SpawnedClasses->Contains(NodeId)) continue;
+		SpawnedClasses->Add(NodeId);
+
+		FMuseumNode* Node = (*NodeIdMap)[NodeId];
+
+		// Recurse into parents regardless of whether the node was spawned
+		Parents->Append(Node->Parents);
+
+		// Only spawn a class node with a name, and ignore empty edge nodes
+		if (!Ignored.Contains(Node->Label) && (Node->Children.Num() > 0 || Node->Software.Num() > 0)) {
+			
+			// Temporarily spawn the class at the origin in order to spawn its software, and then move it
+			AVisualNode* ClassNode = GetWorld()->SpawnActor<AVisualNode>(NodeTemplate, FVector(0), FRotator(0));
+			ClassNode->MuseumNode = Node;
+			// Don't forget that PlaceSoftware() also moves ClassNode to the proper height
+			float ClassRadius = PlaceSoftware(*NodeIdMap, ClassNode);
+
+			/* The following formulas are:
+			**
+			** (For class position)
+			** XNew = |XOld| - (RNew + ROld) * XOld / (YOld * √(XOld^2 / YOld^2 + 1))
+			** YNew = YOld - (RNew + ROld) * sign(YOld) / (√(XOld^2 / YOld^2 + 1))
+			**
+			** (For new circle position)
+			** XOld - RNew * XOld / (YOld * √(XOld^2 / YOld^2 + 1))
+			** YOld - RNew * sign(YOld) / (√(XOld^2 / YOld^2 + 1))
+			** 
+			** where the case of y = 0 is handled appropriately
+			*/
+			// if (OldCenter.Y != 0.f) {
+			// 	float XLegUnit = FMath::Abs(OldCenter.X) / (OldCenter.Y * FMath::Sqrt((OldCenter.X * OldCenter.X) / (OldCenter.Y * OldCenter.Y) + 1));
+			// 	float YLegUnit = FMath::Sign(OldCenter.Y) / (FMath::Sqrt((OldCenter.X * OldCenter.X) / (OldCenter.Y * OldCenter.Y) + 1));
+				
+			// 	ClassPosition.X = OldCenter.X - (ClassRadius + OldRadius) * XLegUnit;
+			// 	ClassPosition.Y = OldCenter.Y - (ClassRadius + OldRadius) * YLegUnit;
+			
+			// 	NewCenter.X = OldCenter.X - ClassRadius * XLegUnit;
+			// 	NewCenter.Y = OldCenter.Y - ClassRadius * YLegUnit;
+			// }
+			// // If the OldCenter is (0, 0) then pick a random direction
+			// else if (OldCenter.X == 0.f) {
+				float Direction = SeededRand.GetFraction() * TwoPi;
+
+				ClassPosition.X = (ClassRadius + OldRadius) * FMath::Cos(Direction);
+				ClassPosition.Y = (ClassRadius + OldRadius) * FMath::Sin(Direction);
+
+				NewCenter.X = OldCenter.X + ClassRadius * FMath::Cos(Direction);
+				NewCenter.Y = OldCenter.Y + ClassRadius * FMath::Sin(Direction);
+			// }
+			// // Otherwise, account for the hole in the function for YOld = 0
+			// else {
+			// 	ClassPosition.X = OldCenter.X - (ClassRadius + OldRadius);
+			// 	ClassPosition.Y = 0.f;
+
+			// 	NewCenter.X = OldCenter.X - ClassRadius;
+			// 	NewCenter.Y = 0.f;
+			// }
+
+			// PlaceSoftware() calculates the correct Z value, so carry that over
+			ClassNode->SetActorLocation(FVector(ClassPosition, ClassNode->GetActorLocation().Z));
+
+			OldRadius = ClassRadius + OldRadius;
+			OldCenter = NewCenter;
+
+			UE_LOG(LogTemp, Warning, TEXT("Moved: %s | Position: (%f, %f) | Total radius: %f | New center: (%f, %f)"), *Node->Label, ClassPosition.X, ClassPosition.Y, OldRadius, NewCenter.X, NewCenter.Y);
+		}
 	}
 
 	delete Classes;
-
-	// if (Parents->Num() > 0)
-	// 	PlaceClasses(NodeIdMap, Parents, CurrentRadius, CurrentCenter);
+	UE_LOG(LogTemp, Warning, TEXT("Spawning complete"));
+	if (Parents->Num() > 0)
+		PlaceClasses(NodeIdMap, SpawnedClasses, Parents, OldRadius, OldCenter);
 }
 
-int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& NodeIdMap, AVisualNode* VisualClassNode) {
+float AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& NodeIdMap, AVisualNode* VisualClassNode) {
 	FMuseumNode& ClassNode = *VisualClassNode->MuseumNode;  // For convenience
 
 	TMap<int32, TArray<FMuseumNode*>> NodesByYear;
 
-	int32 LowestYear = 3000000; // Y2K etc...
+	int32 LowestYear = 30000; // Y2K etc...
 	for (auto& Node : ClassNode.Software) {
-		UE_LOG(LogTemp, Warning, TEXT("Node Id: %s | Type: %s | Label: %s | Uri: %s | ReleaseYear: %i"), 
-			*NodeIdMap[Node]->Id, *NodeIdMap[Node]->Type, *NodeIdMap[Node]->Label, *NodeIdMap[Node]->Uri,
-			NodeIdMap[Node]->ReleaseYear);
+		// UE_LOG(LogTemp, Warning, TEXT("Node Id: %s | Type: %s | Label: %s | Uri: %s | ReleaseYear: %i"), 
+		// 	*NodeIdMap[Node]->Id, *NodeIdMap[Node]->Type, *NodeIdMap[Node]->Label, *NodeIdMap[Node]->Uri,
+		// 	NodeIdMap[Node]->ReleaseYear);
 		
 		int32 ReleaseYear = NodeIdMap[Node]->ReleaseYear;
 
@@ -164,14 +242,14 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 		}
 	}
 
-	VisualClassNode->SetActorLocation(FVector(0, 0, (LowestYear - 3) * YearToUnits));
+	if (LowestYear == 30000) return 1.f;
+
+	VisualClassNode->SetActorLocation(FVector(0, 0, (LowestYear - 1940 - 3) * YearToUnits));
 	#if WITH_EDITOR
 		VisualClassNode->SetActorLabel(ClassNode.Label);
 	#endif  // WITH_EDITOR
 
 	float MinRadius = ((USphereComponent*)NodeTemplate->GetDefaultSubobjectByName(TEXT("DetectionMesh")))->GetScaledSphereRadius();
-	// UE_LOG(LogTemp, Warning, TEXT("NodeDistance: %f | MinRadius: %f | LowestYear: %i | YearToUnits: %f"),
-	// 	NodeDistance, MinRadius, LowestYear, YearToUnits);
 
 	float MaxGeneratedRadius = 0.f;
 
@@ -179,7 +257,7 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 		int32 CurrentYear = Element.Key;
 		int32 SoftwarePlaced = 0;
 
-		FVector Center = {0, 0, CurrentYear * YearToUnits};
+		FVector Center = {0, 0, (CurrentYear - 1940) * YearToUnits};
 		FMath::SinCos(&Center.X, &Center.Y, CurrentYear);
 		Center *= FVector(HelixRadius, HelixRadius, 1);
 
@@ -195,9 +273,6 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 		// Evenly space the nodes
 		float Angle = TwoPi / NumSoftware;
 
-		// UE_LOG(LogTemp, Warning, TEXT("Current center: (%f, %f, %f) | Angle: %f | Radius: %f | NumSoftware: %f"), 
-		// 	Center.X, Center.Y, Center.Z, Angle, Radius, NumSoftware);
-
 		float SinAngle, CosAngle;
 		for (auto& SoftwareNode : Element.Value) {
 			FMath::SinCos(&SinAngle, &CosAngle, Angle * SoftwarePlaced++);
@@ -210,5 +285,7 @@ int32 AMuseumGameModeBase::PlaceSoftware(const TMap<FString, FMuseumNode*>& Node
 			#endif // WITH_EDITOR
 		}
 	}
-	return HelixRadius + MaxGeneratedRadius;
+	float TotalRadius = HelixRadius + MaxGeneratedRadius;
+	// UE_LOG(LogTemp, Warning, TEXT("Spawned: %s | Start year: %i | Radius: %f"), *ClassNode.Label, LowestYear, TotalRadius);
+	return TotalRadius;
 }
